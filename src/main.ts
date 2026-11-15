@@ -23,6 +23,9 @@ const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
+const ARROW =
+  '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
 const visible = (s: string) => s.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
 
 function toast(msg: string) {
@@ -290,7 +293,7 @@ async function generate() {
     $('#gen-meta').textContent = `${Array.from(payload).length} ตัวอักษร`
     if (t.kind === 'qr') {
       const canvas = document.createElement('canvas')
-      await QRCode.toCanvas(canvas, payload, { width: 280, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0d2236', light: '#ffffff' } })
+      await QRCode.toCanvas(canvas, payload, { width: 560, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0d2236', light: '#ffffff' } })
       visual.replaceChildren(canvas)
       visual.classList.remove('is-barcode')
     } else {
@@ -442,12 +445,12 @@ function inspect(raw: string) {
           <h3>แปลงเป็น PromptPay Tag 30</h3>
           <p class="hint">ได้จาก <code>barcode.toQrTag30()</code> ใช้ได้หรือไม่ขึ้นกับธนาคารของผู้รับชำระ</p>
           <div class="payload mono">${anatomy(qr)}</div>
-          <div class="actions"><button class="btn primary" data-load="${esc(qr)}">ตรวจ QR นี้ →</button></div>
+          <div class="actions"><button class="btn primary" data-load="${esc(qr)}">ตรวจ QR นี้ ${ARROW}</button></div>
         </div>
         <div class="qr-frame small" id="bc-qr"></div>
       </div>`
     const c = document.createElement('canvas')
-    QRCode.toCanvas(c, qr, { width: 200, margin: 1, color: { dark: '#0d2236', light: '#ffffff' } }).then(() => $('#bc-qr')?.append(c))
+    QRCode.toCanvas(c, qr, { width: 400, margin: 1, color: { dark: '#0d2236', light: '#ffffff' } }).then(() => $('#bc-qr')?.append(c))
     return
   }
 
@@ -497,7 +500,7 @@ function inspect(raw: string) {
               <div class="payload mono" id="edit-payload"></div>
               <div class="actions">
                 <button class="btn" id="edit-copy">คัดลอก</button>
-                <button class="btn primary" id="edit-load">ตรวจผลลัพธ์ →</button>
+                <button class="btn primary" id="edit-load">ตรวจผลลัพธ์ ${ARROW}</button>
               </div>
             </div>
             <div class="qr-frame small" id="edit-qr"></div>
@@ -522,7 +525,7 @@ function inspect(raw: string) {
       $('#edit-payload').innerHTML = anatomy(next)
       $('#edit-payload').dataset.raw = next
       const c = document.createElement('canvas')
-      await QRCode.toCanvas(c, next, { width: 200, margin: 1, color: { dark: '#0d2236', light: '#ffffff' } })
+      await QRCode.toCanvas(c, next, { width: 400, margin: 1, color: { dark: '#0d2236', light: '#ffffff' } })
       $('#edit-qr').replaceChildren(c)
     }
     input.addEventListener('input', update)

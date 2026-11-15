@@ -51,17 +51,13 @@
       <!-- GENERATE -->
       <section class="panel" id="panel-generate" role="tabpanel">
         <div class="grid">
-          <div class="card">
+          <div class="card gen-form">
             <label class="field">
               <span>รูปแบบ</span>
               <select id="template"></select>
             </label>
             <p class="hint" id="template-hint"></p>
             <form id="gen-form" class="form" autocomplete="off"></form>
-            <div class="code-sample">
-              <div class="code-head">ตัวอย่าง code</div>
-              <pre><code id="gen-code"></code></pre>
-            </div>
           </div>
 
           <div class="card output">
@@ -75,10 +71,15 @@
               <div class="actions">
                 <button class="btn" id="gen-copy" type="button">คัดลอก</button>
                 <button class="btn" id="gen-download" type="button">ดาวน์โหลด PNG</button>
-                <button class="btn primary" id="gen-inspect" type="button">ตรวจ payload นี้ →</button>
+                <button class="btn primary" id="gen-inspect" type="button">ตรวจ payload นี้ <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
               </div>
             </div>
             <p class="error" id="gen-error" hidden></p>
+          </div>
+
+          <div class="code-sample">
+            <div class="code-head">ตัวอย่าง code</div>
+            <pre><code id="gen-code"></code></pre>
           </div>
         </div>
       </section>
@@ -94,6 +95,7 @@
             <div class="inspect-side">
               <label class="drop" id="drop">
                 <input type="file" id="ins-file" accept="image/*" hidden />
+                <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 12h8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
                 <strong>สแกนจากรูป</strong>
                 <span>ลากมาวาง, paste หรือเลือกรูป QR</span>
               </label>
