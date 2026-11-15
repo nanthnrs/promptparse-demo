@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A static, browser-only playground for the [`promptparse`](https://github.com/maythiwat/promptparse) npm library (PromptPay / EMVCo QR payloads). Vite + vanilla TypeScript, no framework, no backend. Deployed to Cloudflare Workers as static assets on the user's own Cloudflare account. The wrangler login for that account is kept in a separate config dir, so every wrangler command needs `XDG_CONFIG_HOME=~/.config/wrangler-personal` (the default wrangler login is a different account that is not the user's).
+A static, browser-only playground for the [`promptparse`](https://github.com/maythiwat/promptparse) npm library (PromptPay / EMVCo QR payloads). Vite + vanilla TypeScript, no framework, no backend. Deployed to Cloudflare Workers as static assets at https://promptparse-demo.nanth.workers.dev, on the user's own Cloudflare account (account name "Nanthawut", ID `f5d0f4e0f820c1ce3e7c0c7c8281a885`). Source: https://github.com/nanthnrs/promptparse-demo (push as the `nanthnrs` gh account, because the active gh account is a work account).
 
 ## Commands
 
@@ -12,7 +12,7 @@ A static, browser-only playground for the [`promptparse`](https://github.com/may
 - `npm run build`: `tsc --noEmit` type-check, then `vite build` to `dist/`
 - `bun test`: run the tests in `test/` (bun's built-in runner, `bun:test`)
 - `bun test -t "withAmount"`: run a single test by name
-- `XDG_CONFIG_HOME=~/.config/wrangler-personal npm run deploy`: build, then `wrangler deploy` to the user's account
+- `npm run deploy`: build, then `wrangler deploy`. Run `npx wrangler whoami` first and deploy only if it lists account ID `f5d0f4e0f820c1ce3e7c0c7c8281a885`
 
 There is no linter or formatter configured.
 

@@ -1,5 +1,7 @@
 # promptparse playground (unofficial)
 
+Live: https://promptparse-demo.nanth.workers.dev
+
 A browser-only playground for the [`promptparse`](https://github.com/maythiwat/promptparse) library by Maythiwat Chomchuen. It works with PromptPay, TrueMoney and EMVCo QR payloads. The UI is in Thai.
 
 - **Generate**: payment QRs (PromptPay AnyID, Bill Payment, TrueMoney) and BOT barcodes. Slip Verify QRs are also available, for testing slip-verification flows.
