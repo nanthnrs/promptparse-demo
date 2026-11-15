@@ -41,4 +41,6 @@ There is no linter or formatter configured.
 ## Conventions
 
 - Theme: colour tokens live on `:root`. Dark values are defined twice, under `prefers-color-scheme: dark` (guarded by `:not([data-theme='light'])`) and under `[data-theme='dark']`. Change both together. The inline script in `index.html` applies the saved theme before first paint, and `setupTheme()` in `main.ts` cycles through system, light and dark.
+- Audience modes: `<html data-audience="user|dev">` (set before first paint by the inline script in `index.html`, toggled by `setupAudience()` in `main.ts`, stored in `localStorage`). Mark elements `.dev-only` or `.user-only`; CSS hides the other set. Dev mode shows function names, payloads, code snippets and the tag table. User mode shows plain-language results (`userData()`) and hides the slip-verify templates.
+- Layout (`src/style.css`, tokens and spacing scale at the top): tabs live in the sticky top bar on desktop and become a fixed bottom tab bar at 720px and below. Generate is 3 columns (picker, form, sticky QR) from 1200px, 2 columns from 861px, then single column. Inspect has a sticky input column from 1024px. On mobile the tag table renders as cards.
 - UI copy is Thai, with technical terms (payload, CRC, tag, biller ID) and the EMVCo tag names kept in English.

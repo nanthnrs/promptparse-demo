@@ -41,13 +41,27 @@ function toast(msg: string) {
   ;(el as any)._t = setTimeout(() => el!.classList.remove('show'), 1600)
 }
 
-async function copy(text: string) {
+/** Copy to clipboard; when a button is given, it confirms in place for a moment. */
+async function copy(text: string, btn?: HTMLElement | null) {
+  let ok = true
   try {
     await navigator.clipboard.writeText(text)
-    toast('คัดลอกแล้ว')
   } catch {
-    toast('คัดลอกไม่สำเร็จ')
+    ok = false
   }
+  toast(ok ? 'คัดลอกแล้ว' : 'คัดลอกไม่สำเร็จ')
+  if (!btn) return
+  const label = btn.dataset.label ?? btn.textContent ?? ''
+  btn.dataset.label = label
+  btn.textContent = ok ? 'คัดลอกแล้ว' : 'คัดลอกไม่สำเร็จ'
+  btn.classList.toggle('done', ok)
+  clearTimeout(Number(btn.dataset.timer))
+  btn.dataset.timer = String(
+    setTimeout(() => {
+      btn.textContent = label
+      btn.classList.remove('done')
+    }, 1500),
+  )
 }
 
 /* ------------------------------------------------------------------ */
@@ -62,12 +76,18 @@ type Field = {
   placeholder?: string
   value?: string
   optional?: boolean
+  /** Shown in both modes */
   help?: string
+  /** Extra detail shown only in developer mode */
+  devHelp?: string
 }
 
 type Template = {
   id: string
-  name: string
+  /** Plain-language name shown in the picker */
+  title: string
+  /** One-line description in the picker */
+  desc: string
   hint: string
   kind: 'qr' | 'barcode'
   group: 'payment' | 'testing'
@@ -88,24 +108,26 @@ function objLiteral(o: Record<string, unknown>) {
 const templates: Template[] = [
   {
     id: 'anyId',
-    name: 'PromptPay AnyID (Tag 29)',
+    title: 'PromptPay รับเงินเข้าบุคคล',
+    desc: 'โอนเข้าเบอร์มือถือ, เลขบัตรประชาชน หรือ e-wallet',
     hint: 'QR PromptPay ส่วนบุคคล โอนเข้าเบอร์มือถือ, เลขบัตรประชาชน / เลขผู้เสียภาษี หรือ e-wallet ID',
     kind: 'qr',
     group: 'payment',
     fields: [
       {
         key: 'type',
-        label: 'ประเภท proxy',
+        label: 'ระบุผู้รับเงินด้วย',
+        devHelp: 'ใน code เรียกว่า proxy type ใช้ค่า MSISDN (เบอร์มือถือ), NATID หรือ EWALLETID',
         type: 'select',
         options: [
-          { value: 'MSISDN', label: 'MSISDN: เบอร์มือถือ' },
-          { value: 'NATID', label: 'NATID: เลขบัตรประชาชน / เลขผู้เสียภาษี' },
-          { value: 'EWALLETID', label: 'EWALLETID: e-wallet ID' },
+          { value: 'MSISDN', label: 'เบอร์มือถือ' },
+          { value: 'NATID', label: 'เลขบัตรประชาชน / เลขผู้เสียภาษี' },
+          { value: 'EWALLETID', label: 'e-wallet ID' },
         ],
         value: 'MSISDN',
       },
-      { key: 'target', label: 'ผู้รับเงิน', placeholder: '0812345678', value: '0812345678' },
-      { key: 'amount', label: 'จำนวนเงิน (บาท)', type: 'number', placeholder: 'ไม่ระบุจำนวน', optional: true, value: '150' },
+      { key: 'target', label: 'เบอร์ / เลขที่ของผู้รับเงิน', placeholder: '0812345678', value: '0812345678', help: 'ต้องผูก PromptPay ไว้แล้ว', devHelp: 'เบอร์มือถือใส่แบบ 08x ได้ library แปลงเป็น 0066 ให้' },
+      { key: 'amount', label: 'จำนวนเงิน (บาท)', help: 'เว้นว่างได้ ผู้จ่ายจะกรอกจำนวนเองในแอปธนาคาร', type: 'number', placeholder: 'ไม่ระบุจำนวน', optional: true, value: '150' },
     ],
     run: (v) => gen.anyId({ type: v.type as any, target: v.target.trim(), amount: num(v.amount) }),
     code: (v) =>
@@ -113,16 +135,17 @@ const templates: Template[] = [
   },
   {
     id: 'billPayment',
-    name: 'PromptPay Bill Payment (Tag 30)',
+    title: 'PromptPay ชำระบิล',
+    desc: 'ร้านค้าหรือบริษัทรับชำระบิล มี biller ID และเลขอ้างอิง',
     hint: 'QR ชำระบิลของร้านค้า ใช้ biller ID (เลขผู้เสียภาษี + suffix) และเลขอ้างอิง',
     kind: 'qr',
     group: 'payment',
     fields: [
-      { key: 'billerId', label: 'Biller ID', placeholder: '010554412345600', value: '010554412345600' },
-      { key: 'ref1', label: 'เลขอ้างอิง 1', placeholder: 'INV12345', value: 'INV12345' },
+      { key: 'billerId', label: 'Biller ID', placeholder: '010554412345600', value: '010554412345600', help: 'เลขผู้เสียภาษี 13 หลัก + suffix 2 หลัก ได้จากธนาคารตอนสมัครรับชำระบิล' },
+      { key: 'ref1', label: 'เลขอ้างอิง 1', placeholder: 'INV12345', value: 'INV12345', help: 'ใช้จับคู่ว่าการชำระนี้เป็นของบิลไหน เช่น เลขใบแจ้งหนี้หรือรหัสลูกค้า' },
       { key: 'ref2', label: 'เลขอ้างอิง 2', optional: true, placeholder: 'ไม่บังคับ' },
       { key: 'ref3', label: 'เลขอ้างอิง 3', optional: true, placeholder: 'ไม่บังคับ (ไม่มีใน spec, Tag 62.07)' },
-      { key: 'amount', label: 'จำนวนเงิน (บาท)', type: 'number', optional: true, placeholder: 'ไม่ระบุจำนวน', value: '300' },
+      { key: 'amount', label: 'จำนวนเงิน (บาท)', help: 'เว้นว่างได้ ผู้จ่ายจะกรอกจำนวนเองในแอปธนาคาร', type: 'number', optional: true, placeholder: 'ไม่ระบุจำนวน', value: '300' },
     ],
     run: (v) =>
       gen.billPayment({
@@ -143,14 +166,15 @@ const templates: Template[] = [
   },
   {
     id: 'trueMoney',
-    name: 'TrueMoney Wallet',
+    title: 'TrueMoney Wallet',
+    desc: 'รับเงินเข้า TrueMoney แนบข้อความได้',
     hint: 'QR TrueMoney แอปธนาคารอื่นสแกนได้เหมือน QR PromptPay แบบ e-wallet แต่จะไม่เห็นข้อความ (Tag 81)',
     kind: 'qr',
     group: 'payment',
     fields: [
       { key: 'mobileNo', label: 'เบอร์มือถือ', placeholder: '0812345678', value: '0812345678' },
-      { key: 'amount', label: 'จำนวนเงิน (บาท)', type: 'number', optional: true, placeholder: 'ไม่ระบุจำนวน', value: '10' },
-      { key: 'message', label: 'ข้อความ', optional: true, placeholder: 'ขอบคุณครับ', value: 'ขอบคุณครับ' },
+      { key: 'amount', label: 'จำนวนเงิน (บาท)', help: 'เว้นว่างได้ ผู้จ่ายจะกรอกจำนวนเองในแอปธนาคาร', type: 'number', optional: true, placeholder: 'ไม่ระบุจำนวน', value: '10' },
+      { key: 'message', label: 'ข้อความ', optional: true, placeholder: 'ขอบคุณครับ', value: 'ขอบคุณครับ', help: 'แสดงเฉพาะในแอป TrueMoney แอปธนาคารจะไม่เห็น' },
     ],
     run: (v) => gen.trueMoney({ mobileNo: v.mobileNo.trim(), amount: num(v.amount), message: opt(v.message) }),
     code: (v) =>
@@ -162,7 +186,8 @@ const templates: Template[] = [
   },
   {
     id: 'botBarcode',
-    name: 'BOT Barcode',
+    title: 'Barcode ชำระบิล',
+    desc: 'barcode แบบเส้นบนใบแจ้งหนี้ ตามมาตรฐาน ธปท.',
     hint: 'Barcode ชำระบิลตามมาตรฐานธนาคารแห่งประเทศไทย (ข้อมูล Code 128) แปลงเป็น QR Tag 30 ได้ในหน้าตรวจ',
     kind: 'barcode',
     group: 'payment',
@@ -170,7 +195,7 @@ const templates: Template[] = [
       { key: 'billerId', label: 'Biller ID', placeholder: '099999999999990', value: '099999999999990' },
       { key: 'ref1', label: 'เลขอ้างอิง 1', placeholder: '111222333444', value: '111222333444' },
       { key: 'ref2', label: 'เลขอ้างอิง 2', optional: true, placeholder: 'ไม่บังคับ' },
-      { key: 'amount', label: 'จำนวนเงิน (บาท)', type: 'number', optional: true, placeholder: 'เว้นว่าง = ไม่ระบุ', value: '363' },
+      { key: 'amount', label: 'จำนวนเงิน (บาท)', help: 'เว้นว่างได้ ผู้จ่ายจะกรอกจำนวนเองในแอปธนาคาร', type: 'number', optional: true, placeholder: 'เว้นว่าง = ไม่ระบุ', value: '363' },
     ],
     run: (v) =>
       gen.botBarcode({ billerId: v.billerId.trim(), ref1: v.ref1.trim(), ref2: opt(v.ref2), amount: num(v.amount) }),
@@ -184,12 +209,13 @@ const templates: Template[] = [
   },
   {
     id: 'slipVerify',
-    name: 'Slip Verify (Mini QR)',
+    title: 'QR บนสลิปโอนเงิน',
+    desc: 'QR เล็กบนสลิปธนาคาร ใช้ทดสอบระบบตรวจสลิป',
     hint: 'QR เล็กๆ บนสลิปโอนเงิน มีแค่รหัสธนาคารกับเลขอ้างอิง ใช้ทดสอบระบบตรวจสลิปที่ต่อกับ Bank Open API เท่านั้น ไม่ใช่ QR ชำระเงิน',
     kind: 'qr',
     group: 'testing',
     fields: [
-      { key: 'sendingBank', label: 'รหัสธนาคารผู้โอน', placeholder: '002', value: '002' },
+      { key: 'sendingBank', label: 'รหัสธนาคารผู้โอน', placeholder: '002', value: '002', help: 'รหัสธนาคาร 3 หลัก เช่น 002 ธนาคารกรุงเทพ, 004 กสิกรไทย, 014 ไทยพาณิชย์' },
       { key: 'transRef', label: 'เลขอ้างอิงรายการ', placeholder: '0002123123121200011', value: '0002123123121200011' },
     ],
     run: (v) => gen.slipVerify({ sendingBank: v.sendingBank.trim(), transRef: v.transRef.trim() }),
@@ -201,7 +227,8 @@ const templates: Template[] = [
   },
   {
     id: 'trueMoneySlipVerify',
-    name: 'TrueMoney Slip Verify',
+    title: 'QR บนสลิป TrueMoney',
+    desc: 'แบบเดียวกันของ TrueMoney ใช้ทดสอบระบบตรวจสลิป',
     hint: 'QR บนสลิปของ TrueMoney (ใช้ CRC ตัวพิมพ์เล็กและมี tag เฉพาะของ TrueMoney) ใช้ทดสอบระบบตรวจสลิปเท่านั้น ไม่ใช่ QR ชำระเงิน และไม่มีข้อมูลจำนวนเงินหรือบัญชี',
     kind: 'qr',
     group: 'testing',
@@ -227,23 +254,42 @@ const templates: Template[] = [
 
 const state = { template: templates[0], payload: '' }
 
-function renderTemplateSelect() {
-  const sel = $<HTMLSelectElement>('#template')
+/** Turn a template's call into a copy-pasteable snippet that also shows how to render it. */
+function fullSnippet(t: Template, v: Record<string, string>) {
+  const [importLine, call] = t.code(v).split('\n\n')
+  if (t.kind === 'barcode') {
+    return `${importLine}\n\nconst payload = ${call}\n\n// payload คือข้อความใน barcode ส่งให้ library barcode (Code 128) วาดเป็นรูป`
+  }
+  return `${importLine}\nimport QRCode from 'qrcode'\n\nconst payload = ${call}\n\n// promptparse ให้แค่ payload (string)\n// ใช้ library QR อื่นวาดเป็นรูป เช่น qrcode\nconst image = await QRCode.toDataURL(payload)`
+}
+
+function renderTemplateList() {
+  const list = $('#template-list')
   const groups: [Template['group'], string][] = [
-    ['payment', 'QR / barcode รับเงิน'],
-    ['testing', 'สำหรับทดสอบระบบตรวจสลิป'],
+    ['payment', 'QR และ barcode สำหรับรับเงิน'],
+    ['testing', 'สำหรับทดสอบระบบตรวจสลิป (ไม่ใช่ QR รับเงิน)'],
   ]
-  sel.innerHTML = groups
+  list.innerHTML = groups
     .map(
       ([g, label]) =>
-        `<optgroup label="${esc(label)}">${templates
+        `<div class="tpl-set${g === 'testing' ? ' dev-only' : ''}"><p class="tpl-group">${esc(label)}</p>${templates
           .filter((t) => t.group === g)
-          .map((t) => `<option value="${t.id}">${esc(t.name)}</option>`)
-          .join('')}</optgroup>`,
+          .map(
+            (t) => `<label class="tpl">
+              <input type="radio" name="tpl" value="${t.id}"${t === state.template ? ' checked' : ''} />
+              <span class="tpl-body">
+                <span class="tpl-title">${esc(t.title)}</span>
+                <span class="tpl-desc">${esc(t.desc)}</span>
+              </span>
+              <code class="tpl-fn dev-only">${t.id}()</code>
+            </label>`,
+          )
+          .join('')}</div>`,
     )
     .join('')
-  sel.addEventListener('change', () => {
-    state.template = templates.find((t) => t.id === sel.value)!
+  list.addEventListener('change', (e) => {
+    const id = (e.target as HTMLInputElement).value
+    state.template = templates.find((t) => t.id === id)!
     renderForm()
   })
 }
@@ -255,14 +301,18 @@ function renderForm() {
   form.innerHTML = t.fields
     .map((f) => {
       const label = `<span>${esc(f.label)}${f.optional ? ' <em>ไม่บังคับ</em>' : ''}</span>`
+      const help =
+        f.help || f.devHelp
+          ? `<small class="help">${f.help ? esc(f.help) : ''}${f.devHelp ? `<span class="dev-only"> ${esc(f.devHelp)}</span>` : ''}</small>`
+          : ''
       if (f.type === 'select') {
         return `<label class="field">${label}<select name="${f.key}">${f.options!
           .map((o) => `<option value="${o.value}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`)
-          .join('')}</select></label>`
+          .join('')}</select>${help}</label>`
       }
       return `<label class="field">${label}<input name="${f.key}" ${
         f.type === 'number' ? 'type="number" step="0.01" min="0" inputmode="decimal"' : 'type="text"'
-      } placeholder="${esc(f.placeholder ?? '')}" value="${esc(f.value ?? '')}" /></label>`
+      } placeholder="${esc(f.placeholder ?? '')}" value="${esc(f.value ?? '')}" />${help}</label>`
     })
     .join('')
   form.oninput = generate
@@ -282,9 +332,22 @@ async function generate() {
   const v = formValues()
   const err = $('#gen-error')
   const visual = $('#gen-visual')
-  $('#gen-code').textContent = t.code(v)
+  $('#gen-code').textContent = fullSnippet(t, v)
+  $('#gen-explain').innerHTML =
+    t.kind === 'qr'
+      ? `string ที่ <code>${t.id}()</code> return ออกมา นี่คือข้อมูลที่อยู่ใน QR ด้านบน แต่ละช่องสีคือ 1 tag ชี้หรือแตะเพื่อดูว่าเป็น tag อะไร`
+      : `string ที่ <code>${t.id}()</code> return ออกมา คือข้อความใน barcode แบบเส้น (Code 128) อักขระขึ้นบรรทัดแสดงเป็น <code>\\r</code>`
+  $('#gen-user-note').textContent =
+    t.kind === 'qr'
+      ? 'ให้ผู้จ่ายสแกน QR นี้ด้วยแอปธนาคาร หรือดาวน์โหลดไปพิมพ์'
+      : 'barcode ชำระบิลเป็น barcode แบบเส้น หน้านี้แสดงเป็นข้อความ ใช้ปุ่ม "แปลงเป็น QR" เพื่อดู QR ชำระบิลที่มีข้อมูลเดียวกัน'
   try {
     const missing = t.fields.filter((f) => !f.optional && !v[f.key].trim())
+    for (const f of t.fields) {
+      const el = document.querySelector<HTMLElement>(`#gen-form [name="${f.key}"]`)
+      if (missing.includes(f)) el?.setAttribute('aria-invalid', 'true')
+      else el?.removeAttribute('aria-invalid')
+    }
     if (missing.length) throw new Error(`กรุณากรอก: ${missing.map((m) => m.label).join(', ')}`)
     const payload = t.run(v)
     state.payload = payload
@@ -373,7 +436,9 @@ function anatomy(payload: string) {
     .getTags()
     .map((t, i) => {
       const len = ('00' + t.length).slice(-2)
-      return `<span class="seg h${i % 6}" data-tag="${t.id}"><b>${t.id}</b><i>${len}</i>${esc(t.value)}</span>`
+      const name = tagName(t.id, null, p.getTags())
+      const title = `Tag ${t.id}${name ? ` ${name}` : ''} · ยาว ${t.length} ตัวอักษร`
+      return `<span class="seg h${i % 6}" data-tag="${t.id}" title="${esc(title)}"><b>${t.id}</b><i>${len}</i>${esc(t.value)}</span>`
     })
     .join('')
 }
@@ -411,19 +476,84 @@ function renderTagRows(tags: TLVTag[], kind: Kind | null, all: TLVTag[]) {
     .join('')
 }
 
-function renderData(data: unknown) {
-  const entries = Object.entries(data as Record<string, unknown>).filter(([, v]) => v !== undefined)
-  return `<dl class="kv">${entries
-    .map(([k, v]) => `<div><dt>${esc(k)}</dt><dd class="mono">${esc(String(v))}</dd></div>`)
-    .join('')}</dl>`
+function literal(data: Record<string, unknown>) {
+  const lines = Object.entries(data)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `  ${k}: ${typeof v === 'string' ? `'${v}'` : v === null ? 'null' : v},`)
+  return `{\n${lines.join('\n')}\n}`
 }
 
+const DATA_LABELS: Record<string, string> = {
+  type: 'ระบุผู้รับด้วย',
+  target: 'ผู้รับเงิน',
+  mobileNo: 'เบอร์ TrueMoney ผู้รับเงิน',
+  amount: 'จำนวนเงิน (บาท)',
+  billerId: 'Biller ID',
+  ref1: 'เลขอ้างอิง 1',
+  ref2: 'เลขอ้างอิง 2',
+  ref3: 'เลขอ้างอิง 3',
+  sendingBank: 'รหัสธนาคารผู้โอน',
+  transRef: 'เลขอ้างอิงรายการ',
+  eventType: 'ประเภทรายการ',
+  transactionId: 'Transaction ID',
+  date: 'วันที่',
+  ticket: 'Ticket No.',
+  fccref: 'Reference No.',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  MSISDN: 'เบอร์มือถือ',
+  NATID: 'เลขบัตรประชาชน / เลขผู้เสียภาษี',
+  EWALLETID: 'e-wallet ID',
+  BANKACC: 'บัญชีธนาคาร',
+}
+
+/** TrueMoney QRs carry the mobile number as an e-wallet ID (14000 + number); show the number. */
+function friendlyData(kind: Kind | null, data: Record<string, unknown>) {
+  if (kind === 'trueMoney' && typeof data.target === 'string') {
+    return { mobileNo: data.target.replace(/^14000/, ''), amount: data.amount }
+  }
+  return data
+}
+
+/** Plain key/value list for user mode. */
+function userData(data: Record<string, unknown>) {
+  const rows = Object.entries(data)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => {
+      const value = k === 'type' ? (TYPE_LABELS[String(v)] ?? String(v)) : String(v)
+      return `<div><dt>${esc(DATA_LABELS[k] ?? k)}</dt><dd>${esc(value)}</dd></div>`
+    })
+  return `<dl class="kv user-only">${rows.join('')}</dl>`
+}
+
+function snippet(head: string, code: string) {
+  return `<div class="snippet dev-only"><div class="code-head">${esc(head)}</div><pre><code>${esc(code)}</code></pre></div>`
+}
+
+function validator(kind: Kind | null) {
+  return kind === 'trueMoney' ? 'anyId' : String(kind)
+}
+
+function tagLegend(tags: TLVTag[]) {
+  const t = tags.find((x) => x.id === '54') ?? tags[0]
+  const len = ('00' + t.length).slice(-2)
+  const name = tagName(t.id, null, tags) || 'tag'
+  return `<div class="legend">
+      <span class="seg h0"><b>${t.id}</b><i>${len}</i>${esc(t.value)}</span>
+      <span class="legend-parts">
+        <span><b class="mono">${t.id}</b> ID ของ tag (${esc(name)})</span>
+        <span><i class="mono">${len}</i> ความยาวของค่า ${t.length} ตัวอักษร</span>
+        <span><span class="mono">${esc(t.value)}</span> ค่า</span>
+      </span>
+    </div>`
+}
 
 function inspect(raw: string) {
   const out = $('#ins-result')
   const payload = raw.replace(/\\r/g, '\r').trim()
   if (!payload) {
-    out.innerHTML = `<div class="empty">วาง payload, สแกนจากรูป หรือเลือกตัวอย่าง เพื่อดู tag ทั้งหมด</div>`
+    out.innerHTML = `<div class="empty">วาง payload ในช่องด้านบน เลือกรูป QR หรือกดตัวอย่าง แล้วผลการอ่านจะแสดงที่นี่</div>`
     return
   }
 
@@ -437,14 +567,19 @@ function inspect(raw: string) {
     const qr = bc.toQrTag30()
     out.innerHTML = `
       <div class="card">
-        <div class="verdict ok"><span class="pill">BOT Barcode</span> อ่านด้วย <code>parseBarcode()</code></div>
-        ${renderData({ billerId: bc.billerId, ref1: bc.ref1, ref2: bc.ref2 ?? '(ไม่มี)', amount: bc.amount ?? '(ไม่ระบุ)' })}
+        <h3>ผลการอ่าน</h3>
+        <div class="verdict ok"><span class="pill">Barcode ชำระบิล</span> ตามมาตรฐาน ธปท.</div>
+        ${userData({ billerId: bc.billerId, ref1: bc.ref1, ref2: bc.ref2 ?? undefined, amount: bc.amount ?? undefined })}
+        ${snippet(
+          'code ที่ใช้อ่าน และผลลัพธ์',
+          `import { parseBarcode } from 'promptparse'\n\nconst barcode = parseBarcode(payload)\n// barcode:\n${literal({ billerId: bc.billerId, ref1: bc.ref1, ref2: bc.ref2, amount: bc.amount })}`,
+        )}
       </div>
       <div class="card convert">
         <div>
-          <h3>แปลงเป็น PromptPay Tag 30</h3>
-          <p class="hint">ได้จาก <code>barcode.toQrTag30()</code> ใช้ได้หรือไม่ขึ้นกับธนาคารของผู้รับชำระ</p>
-          <div class="payload mono">${anatomy(qr)}</div>
+          <h3>แปลงเป็น QR PromptPay ชำระบิล</h3>
+          <p class="hint"><span class="dev-only">เรียก <code>barcode.toQrTag30()</code> จะได้ payload ของ QR ชำระบิล (Tag 30) ที่มีข้อมูลเดียวกัน </span>ใช้ได้หรือไม่ขึ้นกับธนาคารของผู้รับชำระ</p>
+          <div class="payload mono dev-only">${anatomy(qr)}</div>
           <div class="actions"><button class="btn primary" data-load="${esc(qr)}">ตรวจ QR นี้ ${ARROW}</button></div>
         </div>
         <div class="qr-frame small" id="bc-qr"></div>
@@ -468,39 +603,49 @@ function inspect(raw: string) {
 
   out.innerHTML = `
     <div class="card summary">
+      <h3>ผลการอ่าน</h3>
       <div class="verdicts">
         ${
           crc
             ? crc.ok
-              ? `<div class="verdict ok"><span class="pill">CRC ${crc.id} OK</span> checksum <code>${crc.actual}</code> ถูกต้อง</div>`
-              : `<div class="verdict bad"><span class="pill">CRC ${crc.id} ไม่ตรง</span> พบ <code>${esc(crc.actual)}</code> แต่ที่ถูกคือ <code>${crc.expected}</code> <button class="link" data-load="${esc(payload.slice(0, -4) + crc.expected)}">แก้ให้ถูก</button></div>`
-            : `<div class="verdict warn"><span class="pill">ไม่มี CRC</span> ไม่พบ CRC tag (63 หรือ 91) ท้ายข้อมูล</div>`
+              ? `<div class="verdict ok"><span class="pill"><span class="user-only">ข้อมูลครบถ้วน</span><span class="dev-only">CRC ถูกต้อง</span></span> <span class="user-only">QR นี้ไม่ได้ถูกแก้ไข</span><span class="dev-only">checksum <code>${crc.actual}</code> ตรงกับข้อมูล payload ไม่ได้ถูกแก้</span></div>`
+              : `<div class="verdict bad"><span class="pill"><span class="user-only">ข้อมูลไม่ถูกต้อง</span><span class="dev-only">CRC ไม่ตรง</span></span> <span class="user-only">ข้อความอาจพิมพ์ผิดหรือถูกแก้ แอปธนาคารจะไม่รับ QR นี้</span><span class="dev-only">checksum 4 ตัวท้ายคือ <code>${esc(crc.actual)}</code> แต่ควรเป็น <code>${crc.expected}</code> payload อาจพิมพ์ผิดหรือถูกแก้ แอปธนาคารจะไม่ยอมรับ</span> <button class="link" data-load="${esc(payload.slice(0, -4) + crc.expected)}">แก้ checksum ให้ถูก</button></div>`
+            : `<div class="verdict warn"><span class="pill">ไม่ใช่ QR ชำระเงิน</span> <span class="user-only">ไม่พบส่วนตรวจสอบข้อมูลท้ายข้อความ</span><span class="dev-only">ไม่พบ CRC tag (63 หรือ 91) ท้ายข้อมูล</span></div>`
         }
         ${
           found
-            ? `<div class="verdict ok"><span class="pill">${esc(found.label)}</span> ตรวจพบด้วย <code>validate.${kind === 'trueMoney' ? 'anyId' : kind}()</code></div>`
+            ? `<div class="verdict ok"><span class="pill">${esc(found.label)}</span> ประเภทของ QR นี้</div>`
             : crc?.ok
-              ? `<div class="verdict warn"><span class="pill">EMVCo ทั่วไป</span> TLV ถูกต้อง แต่ไม่ตรงกับรูปแบบที่รู้จัก</div>`
+              ? `<div class="verdict warn"><span class="pill">QR ประเภทอื่น</span> <span class="user-only">อ่านได้ แต่ไม่ใช่ QR PromptPay หรือ TrueMoney ที่รู้จัก</span><span class="dev-only">อ่าน tag ได้ แต่ไม่ใช่ประเภทที่ <code>validate</code> รู้จัก ดูข้อมูลดิบได้ในตารางด้านล่าง</span></div>`
               : ''
         }
       </div>
-      ${found ? renderData(found.data) : ''}
+      ${found ? userData(friendlyData(kind, found.data as Record<string, unknown>)) : ''}
+      ${
+        found
+          ? snippet(
+              'code ที่ใช้อ่าน และผลลัพธ์',
+              `import { ${validator(kind)} } from 'promptparse/validate'\n\nconst result = ${validator(kind)}(payload)\n// คืนค่า null ถ้า payload ไม่ใช่ประเภทนี้หรือ CRC ผิด\n// result:\n${literal(found.data as Record<string, unknown>)}`,
+            )
+          : ''
+      }
     </div>
 
     ${
       editable
         ? `<div class="card editor">
             <div>
-              <h3>แก้ไขจำนวนเงิน</h3>
-              <p class="hint">เขียน Tag 54 และ Tag 01 ใหม่ แล้วคำนวณ CRC ใหม่ด้วย <code>encode()</code> และ <code>withCrcTag()</code></p>
+              <h3><span class="user-only">เปลี่ยนจำนวนเงิน</span><span class="dev-only">ลองแก้จำนวนเงิน</span></h3>
+              <p class="hint"><span class="user-only">ใส่จำนวนใหม่ แล้วจะได้ QR ใหม่ทันที ผู้รับเงินยังเป็นคนเดิม</span><span class="dev-only">ตัวอย่างการแก้ค่าใน QR ที่มีอยู่แล้ว: แยก tag ด้วย <code>parse()</code> เปลี่ยน Tag 54 (จำนวนเงิน) แล้วต่อกลับด้วย <code>encode()</code> และคำนวณ CRC ใหม่ด้วย <code>withCrcTag()</code></span></p>
               <div class="edit-row">
                 <input id="edit-amount" type="number" step="0.01" min="0" inputmode="decimal" placeholder="ไม่ระบุจำนวน" value="${currentAmount ? Number(currentAmount) : ''}" />
                 <span>บาท</span>
               </div>
-              <div class="payload mono" id="edit-payload"></div>
+              <div class="payload mono dev-only" id="edit-payload"></div>
               <div class="actions">
-                <button class="btn" id="edit-copy">คัดลอก</button>
-                <button class="btn primary" id="edit-load">ตรวจผลลัพธ์ ${ARROW}</button>
+                <button class="btn dev-only" id="edit-copy">คัดลอก</button>
+                <button class="btn user-only" id="edit-download">ดาวน์โหลด PNG</button>
+                <button class="btn primary" id="edit-load">อ่าน QR นี้ ${ARROW}</button>
               </div>
             </div>
             <div class="qr-frame small" id="edit-qr"></div>
@@ -508,11 +653,14 @@ function inspect(raw: string) {
         : ''
     }
 
-    <div class="card">
-      <h3>รายการ tag</h3>
+    <div class="card dev-only">
+      <h3>ข้างใน payload มีอะไร</h3>
+      <p class="hint">QR แบบ EMVCo เก็บข้อมูลเป็น tag ต่อกันเป็นสายเดียว แต่ละ tag มี 3 ส่วน เช่น</p>
+      ${tagLegend(tags)}
+      <p class="hint">ทั้ง payload แยกเป็น tag ได้ดังนี้ ในตาราง tag ที่มี tag ย่อยซ้อนอยู่จะแสดงเยื้องเข้าไป อ่านค่าใน code ได้ด้วย <code>parse(payload).getTagValue('54')</code></p>
       <div class="payload mono anatomy">${anatomy(payload)}</div>
       <div class="tag-table">
-        <div class="row head"><span>ID</span><span>ชื่อ</span><span>ยาว</span><span>ค่า</span></div>
+        <div class="row head"><span>ID</span><span>ชื่อ</span><span>ความยาว</span><span>ค่า</span></div>
         ${renderTagRows(tags, kind, tags)}
       </div>
     </div>`
@@ -529,7 +677,8 @@ function inspect(raw: string) {
       $('#edit-qr').replaceChildren(c)
     }
     input.addEventListener('input', update)
-    $('#edit-copy').onclick = () => copy($('#edit-payload').dataset.raw ?? '')
+    $('#edit-copy').onclick = () => copy($('#edit-payload').dataset.raw ?? '', $('#edit-copy'))
+    $('#edit-download').onclick = () => downloadCanvas($('#edit-qr').querySelector('canvas'), 'qr-new-amount.png')
     $('#edit-load').onclick = () => load($('#edit-payload').dataset.raw ?? '')
     update()
   }
@@ -561,7 +710,18 @@ document.addEventListener('click', (e) => {
 /* Image scanning                                                      */
 /* ------------------------------------------------------------------ */
 
+function scanState(state: 'idle' | 'busy' | 'error', message = '') {
+  const drop = $('#drop')
+  const err = $('#scan-error')
+  drop.classList.toggle('busy', state === 'busy')
+  drop.setAttribute('aria-busy', String(state === 'busy'))
+  $('#drop-title').textContent = state === 'busy' ? 'กำลังอ่านรูป…' : 'เลือกรูป QR'
+  err.textContent = message
+  err.hidden = state !== 'error'
+}
+
 async function scanFile(file: File) {
+  scanState('busy')
   try {
     const bmp = await createImageBitmap(file)
     const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height))
@@ -573,13 +733,14 @@ async function scanFile(file: File) {
     const img = ctx.getImageData(0, 0, w, h)
     const res = jsQR(img.data, w, h, { inversionAttempts: 'attemptBoth' })
     if (!res) {
-      toast('ไม่พบ QR code ในรูปนี้')
+      scanState('error', 'ไม่พบ QR ในรูปนี้ ลองใช้รูปที่เห็น QR ชัดและไม่ตัดขอบ')
       return
     }
+    scanState('idle')
     load(res.data)
     toast('อ่าน QR สำเร็จ')
   } catch {
-    toast('อ่านรูปนี้ไม่ได้')
+    scanState('error', 'เปิดรูปนี้ไม่ได้ ลองใช้ไฟล์ PNG หรือ JPG')
   }
 }
 
@@ -613,22 +774,29 @@ function setupScanner() {
 
 function switchTab(name: string) {
   document.querySelectorAll<HTMLButtonElement>('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)))
-  $('#panel-generate').hidden = name !== 'generate'
-  $('#panel-inspect').hidden = name !== 'inspect'
+  for (const id of ['generate', 'inspect']) {
+    const panel = $(`#panel-${id}`)
+    const show = id === name
+    panel.hidden = !show
+  }
   history.replaceState(null, '', name === 'inspect' ? '#inspect' : '#')
 }
 
 function setupSamples() {
-  const samples: [string, string][] = [
-    ['AnyID', gen.anyId({ type: 'MSISDN', target: '0812345678', amount: 150 })],
-    ['Bill Payment', gen.billPayment({ billerId: '010554412345600', ref1: 'INV12345', ref2: 'CUST01', amount: 300 })],
-    ['TrueMoney', gen.trueMoney({ mobileNo: '0812345678', amount: 10, message: 'ขอบคุณครับ' })],
-    ['Slip Verify', gen.slipVerify({ sendingBank: '002', transRef: '0002123123121200011' })],
-    ['BOT Barcode', gen.botBarcode({ billerId: '099999999999990', ref1: '111222333444', amount: 363 })],
-    ['CRC ผิด', gen.anyId({ type: 'NATID', target: '1234567890123' }).slice(0, -4) + 'FFFF'],
+  // [label, payload, developer-only]
+  const samples: [string, string, boolean][] = [
+    ['PromptPay', gen.anyId({ type: 'MSISDN', target: '0812345678', amount: 150 }), false],
+    ['ชำระบิล', gen.billPayment({ billerId: '010554412345600', ref1: 'INV12345', ref2: 'CUST01', amount: 300 }), false],
+    ['TrueMoney', gen.trueMoney({ mobileNo: '0812345678', amount: 10, message: 'ขอบคุณครับ' }), false],
+    ['Barcode ชำระบิล', gen.botBarcode({ billerId: '099999999999990', ref1: '111222333444', amount: 363 }), false],
+    ['Slip Verify', gen.slipVerify({ sendingBank: '002', transRef: '0002123123121200011' }), true],
+    ['CRC ผิด', gen.anyId({ type: 'NATID', target: '1234567890123' }).slice(0, -4) + 'FFFF', true],
   ]
   $('#samples').innerHTML = samples
-    .map(([label, p]) => `<button class="chip" data-load="${esc(visible(p))}">${label}</button>`)
+    .map(
+      ([label, p, dev]) =>
+        `<button class="chip${dev ? ' dev-only' : ''}" data-load="${esc(visible(p))}">${label}</button>`,
+    )
     .join('')
 }
 
@@ -668,8 +836,9 @@ function applyTheme(t: Theme) {
     /* storage unavailable: theme still applies for this visit */
   }
   const btn = $<HTMLButtonElement>('#theme-btn')
-  btn.innerHTML = `${THEMES[t].icon}<span>${THEMES[t].label}</span>`
+  btn.innerHTML = THEMES[t].icon
   btn.setAttribute('aria-label', `Theme: ${THEMES[t].label} (กดเพื่อเปลี่ยน)`)
+  btn.title = `Theme: ${THEMES[t].label}`
 }
 
 function setupTheme() {
@@ -680,25 +849,64 @@ function setupTheme() {
   })
 }
 
+/* ------------------------------------------------------------------ */
+/* Audience: user / developer                                          */
+/* ------------------------------------------------------------------ */
+
+type Audience = 'user' | 'dev'
+
+function currentAudience(): Audience {
+  return document.documentElement.dataset.audience === 'user' ? 'user' : 'dev'
+}
+
+function applyAudience(a: Audience) {
+  document.documentElement.dataset.audience = a
+  try {
+    localStorage.setItem('audience', a)
+  } catch {
+    /* storage unavailable: mode still applies for this visit */
+  }
+  document.querySelectorAll<HTMLButtonElement>('[data-audience-btn]').forEach((b) =>
+    b.setAttribute('aria-pressed', String(b.dataset.audienceBtn === a)),
+  )
+  // Slip-verify templates are developer tooling; fall back to the default in user mode.
+  if (a === 'user' && state.template.group === 'testing') {
+    state.template = templates[0]
+    const radio = document.querySelector<HTMLInputElement>(`input[name="tpl"][value="${state.template.id}"]`)
+    if (radio) radio.checked = true
+    renderForm()
+  }
+}
+
+function setupAudience() {
+  applyAudience(currentAudience())
+  document.querySelectorAll<HTMLButtonElement>('[data-audience-btn]').forEach((b) =>
+    b.addEventListener('click', () => applyAudience(b.dataset.audienceBtn as Audience)),
+  )
+}
+
+function downloadCanvas(c: HTMLCanvasElement | null, name: string) {
+  if (!c) return
+  const a = document.createElement('a')
+  a.href = c.toDataURL('image/png')
+  a.download = name
+  a.click()
+}
+
 function boot() {
   setupTheme()
   $('#lib-version').textContent = `v${__LIB_VERSION__}`
-  renderTemplateSelect()
+  renderTemplateList()
   renderForm()
+  setupAudience()
   setupSamples()
   setupScanner()
 
   document.querySelectorAll<HTMLButtonElement>('.tab').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab!)))
-  $('#gen-copy').onclick = () => state.payload && copy(state.payload)
+  $('#gen-copy').onclick = () => state.payload && copy(state.payload, $('#gen-copy'))
+  $('#install-copy').onclick = () => copy('npm i promptparse', $('#install-copy'))
   $('#gen-inspect').onclick = () => state.payload && load(state.payload)
-  $('#gen-download').onclick = () => {
-    const c = $('#gen-visual').querySelector('canvas')
-    if (!c) return
-    const a = document.createElement('a')
-    a.href = c.toDataURL('image/png')
-    a.download = `${state.template.id}-qr.png`
-    a.click()
-  }
+  $('#gen-download').onclick = () => downloadCanvas($('#gen-visual').querySelector('canvas'), `${state.template.id}-qr.png`)
 
   const ta = $<HTMLTextAreaElement>('#ins-input')
   ta.addEventListener('input', () => inspect(ta.value))
