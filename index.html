@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>promptparse playground (unofficial)</title>
+    <meta
+      name="description"
+      content="สร้าง อ่าน ตรวจ และแก้ไข payload ของ QR PromptPay, TrueMoney และ EMVCo บน browser ด้วย library promptparse (เว็บไม่เป็นทางการ)"
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23113a5c'/%3E%3Cpath d='M8 8h6v6H8zM18 8h6v6h-6zM8 18h6v6H8zM18 18h2v2h-2zM22 22h2v2h-2zM18 22h2v2h-2zM22 18h2v2h-2z' fill='%23f6c453'/%3E%3C/svg%3E" />
+    <script>
+      try {
+        var t = localStorage.getItem('theme')
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t
+      } catch (e) {}
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="wrap masthead-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1>promptparse playground <span class="unofficial">unofficial</span></h1>
+            <p class="tagline">
+              สร้าง อ่าน และแก้ไข payload ของ QR PromptPay และ EMVCo ทำงานบน browser ของคุณทั้งหมด
+            </p>
+          </div>
+        </div>
+        <nav class="links">
+          <a href="https://github.com/maythiwat/promptparse" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://www.npmjs.com/package/promptparse" target="_blank" rel="noopener">npm</a>
+          <button class="theme-btn" id="theme-btn" type="button"></button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab" data-tab="generate" aria-selected="true">สร้าง QR</button>
+        <button role="tab" class="tab" data-tab="inspect" aria-selected="false">ตรวจและแก้ไข</button>
+      </div>
+
+      <!-- GENERATE -->
+      <section class="panel" id="panel-generate" role="tabpanel">
+        <div class="grid">
+          <div class="card">
+            <label class="field">
+              <span>รูปแบบ</span>
+              <select id="template"></select>
+            </label>
+            <p class="hint" id="template-hint"></p>
+            <form id="gen-form" class="form" autocomplete="off"></form>
+            <div class="code-sample">
+              <div class="code-head">ตัวอย่าง code</div>
+              <pre><code id="gen-code"></code></pre>
+            </div>
+          </div>
+
+          <div class="card output">
+            <div class="qr-frame" id="gen-visual"></div>
+            <div class="payload-box">
+              <div class="payload-head">
+                <span>Payload</span>
+                <span class="meta" id="gen-meta"></span>
+              </div>
+              <div class="payload mono" id="gen-payload"></div>
+              <div class="actions">
+                <button class="btn" id="gen-copy" type="button">คัดลอก</button>
+                <button class="btn" id="gen-download" type="button">ดาวน์โหลด PNG</button>
+                <button class="btn primary" id="gen-inspect" type="button">ตรวจ payload นี้ →</button>
+              </div>
+            </div>
+            <p class="error" id="gen-error" hidden></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSPECT -->
+      <section class="panel" id="panel-inspect" role="tabpanel" hidden>
+        <div class="card">
+          <div class="inspect-input">
+            <label class="field grow">
+              <span>ข้อมูลจาก QR หรือ barcode</span>
+              <textarea id="ins-input" rows="3" spellcheck="false" placeholder="00020101021229370016A000000677010111..."></textarea>
+            </label>
+            <div class="inspect-side">
+              <label class="drop" id="drop">
+                <input type="file" id="ins-file" accept="image/*" hidden />
+                <strong>สแกนจากรูป</strong>
+                <span>ลากมาวาง, paste หรือเลือกรูป QR</span>
+              </label>
+              <div class="samples">
+                <span>ตัวอย่าง:</span>
+                <div id="samples"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="ins-result" class="result"></div>
+      </section>
+    </main>
+
+    <footer class="wrap foot">
+      <p>
+        เว็บไม่เป็นทางการ สร้างด้วย <a href="https://github.com/maythiwat/promptparse" target="_blank" rel="noopener">promptparse</a>
+        <span id="lib-version"></span> © Maythiwat Chomchuen (MIT) · QR ใช้ qrcode (MIT) และ jsQR (Apache-2.0) ·
+        <a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noopener">license ทั้งหมด</a>
+      </p>
+      <p>
+        ข้อมูล payload ประมวลผลบน browser และไม่ถูกส่งออกจากหน้านี้ (font โหลดจาก Google Fonts) ·
+        สำหรับทดสอบและพัฒนาเท่านั้น ไม่รับประกันความถูกต้อง ตรวจสอบ QR ก่อนใช้รับเงินจริง
+      </p>
+      <p>
+        ไม่มีส่วนเกี่ยวข้องและไม่ได้รับการรับรองจากผู้พัฒนา promptparse, PromptPay, TrueMoney, ธนาคารแห่งประเทศไทย หรือ BCEL
+        ชื่อและเครื่องหมายการค้าเป็นของเจ้าของแต่ละราย
+      </p>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
